@@ -1,0 +1,67 @@
+Global_Mobility_Report <- read.csv("C:/Kirti_research/Donate your Data analysis_2021/Global_Mobility_Report.csv", stringsAsFactors=TRUE)
+#import libraries####
+library(tidyverse)
+library(epiDisplay)
+library(zoo)
+library(ggpubr)
+
+#Load Google mobility DATA####
+CANADA=Global_Mobility_Report %>% filter(country_region_code == "CA")
+rm(Global_Mobility_Report)
+########Google mobility with ecobee mobility_Ontario####
+Ontarioecobeemobility <- read.csv("C:/Kirti_research/Donate your Data analysis_2021/ecobee mobility afet time zone adjustment_final/Ontario_ecobee mobility (N=7134).csv")
+range(Ontarioecobeemobility$Date)
+Onecobeemobref<-Ontarioecobeemobility%>%dplyr::filter(Date >="2020-01-03" & Date <= "2020-02-06")
+ontarioecobeemedian=median(Onecobeemobref$avg.ts.)#median value 0.2187967
+rm(Onecobeemobref)
+Ontarioecobeemobility$diff<-(Ontarioecobeemobility$avg.ts.-0.2187967)
+Ontarioecobeemobility$diffpercent<-Ontarioecobeemobility$diff*100
+Ontarioecobeemobility$Date<-as.POSIXct(Ontarioecobeemobility$Date)
+Ontarioecobeemobility<-Ontarioecobeemobility%>%dplyr::filter(Date >="2020-02-15" & Date <= "2021-02-14")
+###Google mobility 
+Ontariogooglemobility = CANADA %>% filter(sub_region_1=="Ontario")
+Ontariogooglemobility$date<-as.POSIXct(Ontariogooglemobility$date)
+Ontariomobilitymean<-Ontariogooglemobility %>%
+  group_by(date) %>%
+  summarise(residential = mean(residential_percent_change_from_baseline,na.rm=T))
+Ontariogooglemobility<-Ontariomobilitymean%>%dplyr::filter(date >="2020-02-15" & date <= "2021-02-14")
+rm(Ontariomobilitymean)
+ontariogoogleresidential=range(Ontariogooglemobility$residential)#-2.28 34.00
+ontarioecobeediffrange=range(Ontarioecobeemobility$diff)# -0.04337932  0.07838433
+rm(ontarioecobeediffrange)
+ontarioecobeediffpercentrange=range(Ontarioecobeemobility$diffpercent)# -4.34 7.84
+Google_ecobee_on_mobility = ggplot() + 
+  geom_line(data=Ontariogooglemobility,aes(date,residential), color = "blue") +
+  geom_line(data=Ontarioecobeemobility,aes(Date,diffpercent*2.8), color = "red") +
+  geom_smooth()+
+  ggtitle("Association between residential mobility data from ecobee and Google for the province of Ontario")+
+  xlab('Timeline') +
+  scale_y_continuous(name = "",sec.axis = sec_axis(~./2.8, name = "Residential_%_change in ecobee mobility_from_baseline"))+
+  theme(
+    plot.title = element_text(color="black", size=16, face="bold",hjust = 0.5),
+    axis.title.y = element_text(color = "purple",size=16),
+    axis.title.y.right = element_text(color = "blue",size=16))+
+  scale_x_datetime(
+    date_breaks = ("1 month"),
+    date_labels = ("%b %Y"),
+    position = ("bottom"))+
+  geom_vline(xintercept=as.numeric(Ontariogooglemobility$date[24]), linetype=4,show.legend = T)+
+  geom_vline(xintercept=as.numeric(Ontariogooglemobility$date[30]), linetype=4,show.legend = T)+
+  geom_vline(xintercept=as.numeric(Ontariogooglemobility$date[38]), linetype=4,show.legend = T)+
+  geom_vline(xintercept=as.numeric(Ontariogooglemobility$date[159]), linetype=4,show.legend = T)+
+  geom_vline(xintercept=as.numeric(Ontariogooglemobility$date[314]), linetype=4,show.legend = T)
+#24-march 11-Pandemic declaration,
+#30 stands for emergency declaration in ontario March 17, 2020,
+#38- march 25- work from home policy in Ontario, 
+#159- JUly 24 provincewide lockdown ended, 
+#314- second wave province wide lockdown started on 26 dec 2020, 
+Google_ecobee_on_mobility
+Ontarioecobeemobility$date=Ontarioecobeemobility$Date
+oncordf=left_join(Ontarioecobeemobility,Ontariogooglemobility,by="date")
+ontariopearsoncor=cor.test(oncordf$diffpercent,oncordf$residential,conf.level = 0.95)
+ontariospearmancor=cor.test(oncordf$diff,oncordf$residential,method = "spearman",conf.level = 0.95,exact = NULL)
+
+ontariocorplot=ggplot(oncordf,aes(diffpercent,residential))+geom_point()+geom_smooth(method="lm", se=TRUE, fullrange=FALSE, level=0.95)+
+  xlab('ecobee mobility')+ylab('Google Residential mobility')+
+  ggtitle("Ontario")
+ontariocorplot
