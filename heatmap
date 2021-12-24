@@ -1,0 +1,45 @@
+#### Installing and loading all required packages#### 
+
+library(data.table)
+library(cowplot)
+library(naniar)
+library(tidyverse)
+library(data.table)
+library(factoextra)
+library(cluster)
+library(fpc)
+library(stringi)
+library (summarytools)
+library (VIM)
+library(epiDisplay)
+library(zoo)
+library(plyr)
+library(xts)
+library(highfrequency)
+library(dplyr) # easier data wrangling 
+library(viridis) # colour blind friendly palette, works in B&W also
+library(Interpol.T) #  will generate a large dataset on initial load
+library(lubridate) # for easy date manipulation
+library(ggExtra) # because remembering ggplot theme options is beyond me
+library(tidyr)
+library(cowplot)
+
+####data import january ####
+dataJan2020 <- read.csv("~/Plinio Data/report-511834159766-2020-01-01-to-2020-01-31.csv")
+dataJan2020$DateTime<- as.POSIXct(paste(dataJan2020$Date, dataJan2020$Time), format="%Y-%m-%d %H:%M")  
+  
+dataJan2020 <- dataJan2020[-c(1:12), ] #when first few rows have some unrelevant information needs to be cleaned 
+dataJan2020 <- dataJan2020 %>% select(DateTime,Thermostat.Motion, ends_with("2"))
+dataJan2020$ts<-as.numeric(apply(dataJan2020[,2:31],1, sum))
+dataJan2020_30min <- aggregate(dataJan2020["ts"],list(DateTime=cut(dataJan2020$DateTime, "30 mins")),sum)
+dataJan2020_30min$date<-as.POSIXct(dataJan2020_30min$DateTime,format="%Y-%m-%d")
+dataJan2020_30min$Time <- as.ITime(dataJan2020_30min$DateTime)
+dataJan2020_30min$timech<- as.character(dataJan2020_30min$Time)
+
+dataJan2020_30min$weekday = as.POSIXlt(dataJan2020_30min$date)$wday #finding the day no. of the week
+dataJan2020_30min$weekdayf<-factor(dataJan2020_30min$weekday,levels=rev(0:6),labels=rev(c("Sun","Mon","Tue","Wed","Thu","Fri","Sat")),ordered=TRUE) #converting the day no. to factor 
+dataJan2020_30min$daygrp <- ifelse(dataJan2020_30min$weekday==0, "wknd", ifelse(dataJan2020_30min$weekday==2, "wkds", ifelse(dataJan2020_30min$weekday==3, "wkds", ifelse(dataJan2020_30min$weekday==4, "wkds", ifelse(dataJan2020_30min$weekday==5, "wknd", ifelse(dataJan2020_30min$weekday==1, "wkds",	ifelse(dataJan2020_30min$weekday==6, "wkds", NA  )))))))
+p1 <-ggplot(dataJan2020_30min,aes(dataJan2020_30min$date,timech,fill=ts))+
+  geom_tile(color= "white",size=0.1) + 
+  scale_fill_viridis(name="Half Hrly movts",option ="C")
+p1
